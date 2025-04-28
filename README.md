@@ -13,21 +13,16 @@
 
 ## 环境要求
 
-- Python 3.7+
+- Python 3.10+
 - MySQL 5.7+
 - aiomysql
 
 ## 安装
 
-1. 克隆仓库：
-```bash
-git clone [repository-url]
-cd mysql_readonly_mcp
-```
 
-2. 安装依赖：
 ```bash
-pip install -r requirements.txt
+git clone https://github.com/the-nine-nation/mysql-mcp.git
+pip install -e .
 ```
 
 
