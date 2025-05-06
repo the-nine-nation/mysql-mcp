@@ -216,33 +216,41 @@ async def execute_db_query(query: str, params: tuple | list, max_rows: int) -> s
         if query.count(';') > 1 or (query.count(';') == 1 and not query.strip().endswith(';')):
              return f"Error: Multiple statements are not allowed. Rejected query: {query}"
 
-        # Check if query already has a LIMIT clause (case-insensitive regex)
-        # Simple check for now, can be improved with regex if needed
+        # Check if query already has a LIMIT clause or is a COUNT/aggregate query
         original_query = query.strip()
-        if "limit" not in original_query.lower().split()[-2:]:
-            # Append LIMIT clause only if it's a SELECT query
-            if query_lower.startswith("select"):
-                query = f"{original_query} LIMIT %s"
-                # Add max_rows to params. Need to handle dict vs list/tuple params.
-                if isinstance(params, dict):
-                    # aiomysql with dict params uses %(key)s format.
-                    # Cannot easily mix formats. We'll stick to list/tuple for simplicity when adding LIMIT.
-                    # If original params were dict, this might break. Consider converting dict to list based on query placeholders.
-                    # For now, assume params are list/tuple or empty if we add LIMIT.
-                    if params: 
-                        logger.warning("Mixing dict params with automatic LIMIT might not work as expected.")
-                        # Attempt conversion (naive: assumes order matches simple query)
-                        # This is fragile and might need a more robust solution based on parsing query placeholders
-                        params_list = list(params.values())
-                        params_list.append(max_rows)
-                        params = tuple(params_list)
-                    else:
-                         params = (max_rows,)
-                elif isinstance(params, (list, tuple)):
-                    params = tuple(params) + (max_rows,)
-                else: # Assuming params is empty or None
-                    params = (max_rows,)
-                logger.info(f"Appending LIMIT {max_rows} to query.")
+        has_limit = "limit" in original_query.lower().split()
+        
+        # Don't add LIMIT to aggregate queries (COUNT, SUM, AVG, etc.) or queries that already have LIMIT
+        is_aggregate_query = "count(" in query_lower or "sum(" in query_lower or "avg(" in query_lower or "min(" in query_lower or "max(" in query_lower
+        
+        # Only add LIMIT if it's a SELECT query without LIMIT and not an aggregate query
+        if not has_limit and query_lower.startswith("select") and not is_aggregate_query:
+            query = f"{original_query} LIMIT %s"
+            # Add max_rows to params. Need to handle dict vs list/tuple params.
+            if isinstance(params, dict):
+                # aiomysql with dict params uses %(key)s format.
+                # Cannot easily mix formats. We'll stick to list/tuple for simplicity when adding LIMIT.
+                # If original params were dict, this might break. Consider converting dict to list based on query placeholders.
+                # For now, assume params are list/tuple or empty if we add LIMIT.
+                if params: 
+                    logger.warning("Mixing dict params with automatic LIMIT might not work as expected.")
+                    # Attempt conversion (naive: assumes order matches simple query)
+                    # This is fragile and might need a more robust solution based on parsing query placeholders
+                    params_list = list(params.values())
+                    params_list.append(max_rows)
+                    params = tuple(params_list)
+                else:
+                     params = (max_rows,)
+            elif isinstance(params, (list, tuple)):
+                params = tuple(params) + (max_rows,)
+            else: # Assuming params is empty or None
+                params = (max_rows,)
+            logger.info(f"Appending LIMIT {max_rows} to query.")
+        else:
+            if has_limit:
+                logger.info(f"Query already has LIMIT clause, skipping automatic LIMIT addition.")
+            elif is_aggregate_query:
+                logger.info(f"Aggregate query detected, skipping automatic LIMIT addition.")
             else:
                 logger.info(f"Query is not SELECT, skipping automatic LIMIT addition.")
 
