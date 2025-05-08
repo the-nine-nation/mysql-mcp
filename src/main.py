@@ -103,9 +103,13 @@ tool_specs = [
                     "type": "integer",
                     "description": "Maximum number of rows to return",
                     "default": DB_CONFIG["max_rows"]
+                },
+                "explanation": {
+                    "type": "string",
+                    "description": "One sentence explanation as to why this tool is being used, and how it contributes to the goal."
                 }
             },
-            "required": ["query"]
+            "required": ["query","explanation"]
         }
     },
 ]
